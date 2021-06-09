@@ -9,7 +9,6 @@ Benchmarking results with more interesting components (e.g., various simulated t
 
 ```
 conda env create -f conda_env.yml
-pip install -e .[docs,tests,extra]
 cd custom_dmcontrol
 pip install -e .
 cd custom_dmc2gym
