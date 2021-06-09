@@ -1,0 +1,20 @@
+name: bpref
+channels:
+  - defaults
+dependencies:
+  - python=3.6
+  - pytorch
+  - cudatoolkit=10.1
+  - absl-py
+  - pyparsing
+  - pip
+  - pip:
+    - termcolor
+    - git+git://github.com/deepmind/dm_control.git
+    - tb-nightly
+    - imageio
+    - imageio-ffmpeg
+    - git+git://github.com/facebookresearch/hydra@0.11_branch
+    - matplotlib
+    - glfw==1.11.2
+    - scikit-image
