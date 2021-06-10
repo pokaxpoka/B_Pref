@@ -1,6 +1,6 @@
 # B-Pref: Benchmark for Preference-based RL
 
-Official codebase for [PEBBLE: Feedback-Efficient Interactive Reinforcement Learning via Relabeling Experience and Unsupervised Pre-training](https://arxiv.org/abs/xxxx). Contains scripts to reproduce experiments.
+Official codebase for [PEBBLE: Feedback-Efficient Interactive Reinforcement Learning via Relabeling Experience and Unsupervised Pre-training](https://arxiv.org/abs/2106.05091). Contains scripts to reproduce experiments.
 
 Benchmarking results with more interesting components (e.g., various simulated teachers, sampling schemes, feedback schedule) will be added soon. Please stay tuned!
 
