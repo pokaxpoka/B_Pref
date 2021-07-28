@@ -428,7 +428,6 @@ class RewardModel:
         # logging
         sum_r_t_1 = np.sum(r_t_1, axis=1)
         sum_r_t_2 = np.sum(r_t_2, axis=1)
-        margin_index = (np.abs(sum_r_t_1 - sum_r_t_2) > self.teacher_margin).reshape(-1)
         
         # get labels
         sa_t_1, sa_t_2, r_t_1, r_t_2, labels = self.get_label(
@@ -455,7 +454,6 @@ class RewardModel:
         # logging
         sum_r_t_1 = np.sum(r_t_1, axis=1)
         sum_r_t_2 = np.sum(r_t_2, axis=1)
-        margin_index = (np.abs(sum_r_t_1 - sum_r_t_2) > self.teacher_margin).reshape(-1)
         
         # get labels
         sa_t_1, sa_t_2, r_t_1, r_t_2, labels = self.get_label(    
