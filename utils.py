@@ -36,6 +36,25 @@ def make_env(cfg):
 
     return env
 
+def ppo_make_env(env_id, seed):
+    """Helper function to create dm_control environment"""
+    if env_id == 'ball_in_cup_catch':
+        domain_name = 'ball_in_cup'
+        task_name = 'catch'
+    else:
+        domain_name = env_id.split('_')[0]
+        task_name = '_'.join(env_id.split('_')[1:])
+
+    env = dmc2gym.make(domain_name=domain_name,
+                       task_name=task_name,
+                       seed=seed,
+                       visualize_reward=True)
+    env.seed(seed)
+    assert env.action_space.low.min() >= -1
+    assert env.action_space.high.max() <= 1
+
+    return env
+
 def tie_weights(src, trg):
     assert type(src) == type(trg)
     trg.weight = src.weight
@@ -55,6 +74,21 @@ def make_metaworld_env(cfg):
     env.seed(cfg.seed)
     
     return TimeLimit(NormalizedBoxEnv(env), env.max_path_length)
+
+def ppo_make_metaworld_env(env_id, seed):
+    env_name = env_id.replace('metaworld_','')
+    if env_name in _env_dict.ALL_V2_ENVIRONMENTS:
+        env_cls = _env_dict.ALL_V2_ENVIRONMENTS[env_name]
+    else:
+        env_cls = _env_dict.ALL_V1_ENVIRONMENTS[env_name]
+    
+    env = env_cls()
+    
+    env._freeze_rand_vec = False
+    env._set_task_called = True
+    env.seed(seed)
+    
+    return TimeLimit(env, env.max_path_length)
 
 class eval_mode(object):
     def __init__(self, *models):

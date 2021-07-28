@@ -149,7 +149,6 @@ class Workspace(object):
             # update reward
             for epoch in range(self.cfg.reward_update):
                 if self.cfg.label_margin > 0 or self.cfg.teacher_eps_equal > 0:
-                    # not necessary / will be updated soon
                     train_acc = self.reward_model.train_soft_reward()
                 else:
                     train_acc = self.reward_model.train_reward()
