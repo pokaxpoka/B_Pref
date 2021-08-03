@@ -50,13 +50,7 @@ teacher_eps_skip: hyperparameters to control skip threshold (\in [0,1])
 teacher_eps_equal: hyperparameters to control equal threshold (\in [0,1])
 ```
 
-### PEBBLE
-
-Experiments can be reproduced with the following:
-
-```
-./scripts/[env_name]/[teacher_type]/[max_budget]/run_PEBBLE.sh [sampling_scheme: 0=uniform, 1=disagreement, 2=entropy]
-```
+In B-Pref, we tried the following teachers:
 
 `Oracle teacher`: (teacher_beta=-1, teacher_gamma=1, teacher_eps_mistake=0, teacher_eps_skip=0, teacher_eps_equal=0)
 
@@ -69,4 +63,12 @@ Experiments can be reproduced with the following:
 `Myopic teacher`: (teacher_beta=-1, teacher_gamma=0.9, teacher_eps_mistake=0, teacher_eps_skip=0, teacher_eps_equal=0)
 
 `Equal teacher`: (teacher_beta=-1, teacher_gamma=1, teacher_eps_mistake=0, teacher_eps_skip=0, teacher_eps_equal=0.1)
+
+### PEBBLE
+
+Experiments can be reproduced with the following:
+
+```
+./scripts/[env_name]/[teacher_type]/[max_budget]/run_PEBBLE.sh [sampling_scheme: 0=uniform, 1=disagreement, 2=entropy]
+```
 
