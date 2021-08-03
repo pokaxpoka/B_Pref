@@ -18,15 +18,8 @@ pip install git+https://github.com/rlworkgroup/metaworld.git@master#egg=metaworl
 pip install pybullet
 ```
 
-## Run experiments on oracle teacher
+## Run experiments using GT rewards
 
-### PEBBLE
-
-Experiments can be reproduced with the following:
-
-```
-./scripts/[env_name]/[max_budget]/run_PEBBLE.sh [sampling_scheme: 0=uniform, 1=disagreement, 2=entropy]
-```
 
 ### SAC with true reward
 
@@ -57,7 +50,13 @@ teacher_eps_skip: hyperparameters to control skip threshold (\in [0,1])
 teacher_eps_equal: hyperparameters to control equal threshold (\in [0,1])
 ```
 
-### Examples
+### PEBBLE
+
+Experiments can be reproduced with the following:
+
+```
+./scripts/[env_name]/[teacher_type]/[max_budget]/run_PEBBLE.sh [sampling_scheme: 0=uniform, 1=disagreement, 2=entropy]
+```
 
 `Oracle teacher`: (teacher_beta=-1, teacher_gamma=1, teacher_eps_mistake=0, teacher_eps_skip=0, teacher_eps_equal=0)
 
