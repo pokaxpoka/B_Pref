@@ -10,7 +10,7 @@ dependencies:
   - pip
   - pip:
     - termcolor
-    - git+git://github.com/deepmind/dm_control.git
+    - git+git://github.com/deepmind/dm_control.git@d1fe1d14fb229d3ad784e40d8c54491d30e1f08a
     - tb-nightly
     - imageio
     - imageio-ffmpeg
