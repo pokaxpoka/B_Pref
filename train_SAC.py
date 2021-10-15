@@ -142,10 +142,23 @@ class Workspace(object):
                 with utils.eval_mode(self.agent):
                     action = self.agent.act(obs, sample=True)
 
-            # run training update
-            if self.step >= self.cfg.num_seed_steps:
+            # run training update             
+            if self.step == (self.cfg.num_seed_steps + self.cfg.num_unsup_steps) and self.cfg.num_unsup_steps > 0:
+                # reset Q due to unsuperivsed exploration
+                self.agent.reset_critic()
+                # update agent
+                self.agent.update_after_reset(
+                    self.replay_buffer, self.logger, self.step, 
+                    gradient_update=self.cfg.reset_update, 
+                    policy_update=True)
+            elif self.step > self.cfg.num_seed_steps + self.cfg.num_unsup_steps:
                 self.agent.update(self.replay_buffer, self.logger, self.step)
-
+            # unsupervised exploration
+            elif self.step > self.cfg.num_seed_steps:
+                self.agent.update_state_ent(self.replay_buffer, self.logger, self.step, 
+                                            gradient_update=1, K=self.cfg.topK)
+            
+            
             next_obs, reward, done, extra = self.env.step(action)      
             # allow infinite bootstrap
             done = float(done)
