@@ -379,10 +379,10 @@ class PPO_REWARD(OnPolicyRewardAlgorithm):
         tb_log_name: str = "PPO_REWARD",
         eval_log_path: Optional[str] = None,
         reset_num_timesteps: bool = True,
-        unsuper_flag: bool = False,
+        unsuper_flag: int = 0,
     ) -> "PPO_REWARD":
         
-        if unsuper_flag:
+        if unsuper_flag == 1:
             return super(PPO_REWARD, self).learn_unsuper(
                 total_timesteps=total_timesteps,
                 callback=callback,
@@ -394,7 +394,18 @@ class PPO_REWARD(OnPolicyRewardAlgorithm):
                 eval_log_path=eval_log_path,
                 reset_num_timesteps=reset_num_timesteps,
             )
-        
+        elif unsuper_flag == 2:
+            return super(PPO_REWARD, self).learn_unsuper_true(
+                total_timesteps=total_timesteps,
+                callback=callback,
+                log_interval=log_interval,
+                eval_env=eval_env,
+                eval_freq=eval_freq,
+                n_eval_episodes=n_eval_episodes,
+                tb_log_name=tb_log_name,
+                eval_log_path=eval_log_path,
+                reset_num_timesteps=reset_num_timesteps,
+            )
         return super(PPO_REWARD, self).learn(
             total_timesteps=total_timesteps,
             callback=callback,

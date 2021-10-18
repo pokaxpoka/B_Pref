@@ -9,7 +9,6 @@ from stable_baselines3.ppo import MlpPolicy
 from stable_baselines3.common.env_util import make_vec_dmcontrol_env, make_vec_metaworld_env
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 from stable_baselines3.common.vec_env import VecNormalize
-from reward_model import RewardModel
 
 def linear_schedule(initial_value: Union[float, str]) -> Callable[[float], float]:
     """
@@ -51,22 +50,6 @@ if __name__ == "__main__":
     parser.add_argument("--normalize", help="Normalization", type=int, default=1)
     parser.add_argument("--unsuper-step", help="# of steps for unsupervised learning", type=int, default=32000)
     parser.add_argument("--unsuper-n-epochs", help="# of steps for unsupervised learning", type=int, default=50)
-    # reward learning
-    parser.add_argument("--re-lr", help="Learning rate of reward fn", type=float, default=0.0003)
-    parser.add_argument("--re-segment", help="Size of segment", type=int, default=50)
-    parser.add_argument("--re-act", help="Last activation for reward fn", type=str, default='tanh')
-    parser.add_argument("--re-num-interaction", help="# of interactions", type=int, default=16000)
-    parser.add_argument("--re-num-feed", help="# of feedbacks", type=int, default=1)
-    parser.add_argument("--re-batch", help="Batch size", type=int, default=128)
-    parser.add_argument("--re-update", help="Gradient update of reward fn", type=int, default=100)
-    parser.add_argument("--re-feed-type", help="type of feedback", type=int, default=0)
-    parser.add_argument("--re-large-batch", help="size of buffer for ensemble uncertainty", type=int, default=10)
-    parser.add_argument("--re-max-feed", help="# of total feedback", type=int, default=1400)
-    parser.add_argument("--teacher-beta", type=float, default=-1)
-    parser.add_argument("--teacher-gamma", type=float, default=1.0)
-    parser.add_argument("--teacher-eps-mistake", type=float, default=0.0)
-    parser.add_argument("--teacher-eps-skip", type=float, default=0.0)
-    parser.add_argument("--teacher-eps-equal", type=float, default=0.0)
     args = parser.parse_args()
     
     metaworld_flag = False
@@ -81,22 +64,8 @@ if __name__ == "__main__":
         args.tensorboard_log += 'normalized_' + env_name
     else:
         args.tensorboard_log += env_name
-    
-    args.tensorboard_log += '/teacher_' + str(args.teacher_beta)
-    args.tensorboard_log += '_' + str(args.teacher_gamma)
-    args.tensorboard_log += '_' + str(args.teacher_eps_mistake)
-    args.tensorboard_log += '_' + str(args.teacher_eps_skip)
-    args.tensorboard_log += '_' + str(args.teacher_eps_equal)
-    
+
     args.tensorboard_log += '/lr_'+str(args.lr)
-    args.tensorboard_log += '_reward_lr' + str(args.re_lr)
-    args.tensorboard_log += '_seg' + str(args.re_segment)
-    args.tensorboard_log += '_act' + str(args.re_act)
-    args.tensorboard_log += '_inter' + str(args.re_num_interaction)
-    args.tensorboard_log += '_type' + str(args.re_feed_type)
-    args.tensorboard_log += '_large' + str(args.re_large_batch)
-    args.tensorboard_log += '_rebatch' + str(args.re_batch)
-    args.tensorboard_log += '_reupdate' + str(args.re_update)
     args.tensorboard_log += '_batch_' + str(args.batch_size)
     args.tensorboard_log += '_nenvs_' + str(args.n_envs)
     args.tensorboard_log += '_nsteps_' + str(args.n_steps)
@@ -107,7 +76,6 @@ if __name__ == "__main__":
     args.tensorboard_log += '_gae_' + str(args.gae_lambda)
     args.tensorboard_log += '_clip_' + str(args.clip_init)
     args.tensorboard_log += '_nepochs_' + str(args.n_epochs)
-    args.tensorboard_log += '_maxfeed_' + str(args.re_max_feed)
     args.tensorboard_log += '_unsuper_' + str(args.unsuper_step)
     args.tensorboard_log += '_update_' + str(args.unsuper_n_epochs)
     args.tensorboard_log += '_seed_' + str(args.seed) 
@@ -133,22 +101,7 @@ if __name__ == "__main__":
             n_envs=args.n_envs, 
             monitor_dir=args.tensorboard_log,
             seed=args.seed)
-            
-    # instantiating the reward model
-    reward_model = RewardModel(
-        env.envs[0].observation_space.shape[0],
-        env.envs[0].action_space.shape[0],
-        size_segment=args.re_segment,
-        activation=args.re_act, 
-        lr=args.re_lr,
-        mb_size=args.re_batch, 
-        teacher_beta=args.teacher_beta, 
-        teacher_gamma=args.teacher_gamma, 
-        teacher_eps_mistake=args.teacher_eps_mistake,
-        teacher_eps_skip=args.teacher_eps_skip, 
-        teacher_eps_equal=args.teacher_eps_equal,
-        large_batch=args.re_large_batch)
-    
+        
     if args.normalize == 1:
         env = VecNormalize(env, norm_reward=False)
     
@@ -159,7 +112,7 @@ if __name__ == "__main__":
     
     # train model
     model = PPO_REWARD(
-        reward_model,
+        None,
         MlpPolicy, env,
         tensorboard_log=args.tensorboard_log, 
         seed=args.seed, 
@@ -173,15 +126,15 @@ if __name__ == "__main__":
         gae_lambda=args.gae_lambda,
         clip_range=clip_range,
         n_epochs=args.n_epochs,
-        num_interaction=args.re_num_interaction,
-        num_feed=args.re_num_feed,
-        feed_type=args.re_feed_type,
-        re_update=args.re_update,
+        num_interaction=0,
+        num_feed=0,
+        feed_type=0,
+        re_update=0,
         metaworld_flag=metaworld_flag,
-        max_feed=args.re_max_feed, 
+        max_feed=0, 
         unsuper_step=args.unsuper_step,
         unsuper_n_epochs=args.unsuper_n_epochs,
-        size_segment=args.re_segment,
+        size_segment=0,
         max_ep_len=max_ep_len,
         verbose=1)
 
@@ -190,5 +143,4 @@ if __name__ == "__main__":
         ordered_args = OrderedDict([(key, vars(args)[key]) for key in sorted(vars(args).keys())])
         yaml.dump(ordered_args, f)
         
-    model.learn(total_timesteps=args.total_timesteps, unsuper_flag=1)
-    model.reward_model.save(args.tensorboard_log, args.total_timesteps)
+    model.learn(total_timesteps=args.total_timesteps, unsuper_flag=2)

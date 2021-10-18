@@ -124,7 +124,8 @@ class OnPolicyRewardAlgorithm(BaseAlgorithm):
         self.total_feed = 0
         self.labeled_feedback = 0
         self.noisy_feedback = 0
-        self.reward_batch = self.reward_model.mb_size
+        if self.reward_model:
+            self.reward_batch = self.reward_model.mb_size
         self.unsuper_step = unsuper_step
         self.avg_train_true_return = 0
         self.size_segment = size_segment
@@ -385,7 +386,8 @@ class OnPolicyRewardAlgorithm(BaseAlgorithm):
             num_dones = int(sum(dones))
             if num_dones > 0:
                 # add samples to buffer
-                self.reward_model.add_data_batch(self.traj_obsact, self.traj_reward)
+                if self.reward_model:
+                    self.reward_model.add_data_batch(self.traj_obsact, self.traj_reward)
                 # reset traj
                 self.traj_obsact, self.traj_reward = None, None
                                 
@@ -417,6 +419,96 @@ class OnPolicyRewardAlgorithm(BaseAlgorithm):
                 # Reshape in case of discrete action
                 actions = actions.reshape(-1, 1)
             rollout_buffer.add(self._last_obs, actions, pred_reward, self._last_dones, values, log_probs)
+            self._last_obs = new_obs
+            self._last_dones = dones
+
+        with th.no_grad():
+            # Compute value for the last timestep
+            obs_tensor = th.as_tensor(new_obs).to(self.device)
+            _, values, _ = self.policy.forward(obs_tensor)
+
+        rollout_buffer.compute_returns_and_advantage(last_values=values, dones=dones)
+
+        callback.on_rollout_end()
+
+        return True
+    
+    
+    def collect_rollouts_true(
+        self, env: VecEnv, callback: BaseCallback, rollout_buffer: RolloutBuffer, n_rollout_steps: int
+    ) -> bool:
+        """
+        Collect experiences using the current policy and fill a ``RolloutBuffer``.
+        The term rollout here refers to the model-free notion and should not
+        be used with the concept of rollout used in model-based RL or planning.
+
+        :param env: The training environment
+        :param callback: Callback that will be called at each step
+            (and at the beginning and end of the rollout)
+        :param rollout_buffer: Buffer to fill with rollouts
+        :param n_steps: Number of experiences to collect per environment
+        :return: True if function returned with at least `n_rollout_steps`
+            collected, False if callback terminated rollout prematurely.
+        """
+        assert self._last_obs is not None, "No previous observation was provided"
+        n_steps = 0
+        rollout_buffer.reset()
+        # Sample new weights for the state dependent exploration
+        if self.use_sde:
+            self.policy.reset_noise(env.num_envs)
+
+        callback.on_rollout_start()
+
+        while n_steps < n_rollout_steps:
+            if self.use_sde and self.sde_sample_freq > 0 and n_steps % self.sde_sample_freq == 0:
+                # Sample a new noise matrix
+                self.policy.reset_noise(env.num_envs)
+
+            with th.no_grad():
+                # Convert to pytorch tensor
+                obs_tensor = th.as_tensor(self._last_obs).to(self.device)
+                actions, values, log_probs = self.policy.forward(obs_tensor)
+            actions = actions.cpu().numpy()
+
+            # Rescale and perform action
+            clipped_actions = actions
+            # Clip the actions to avoid out of bound error
+            if isinstance(self.action_space, gym.spaces.Box):
+                clipped_actions = np.clip(actions, self.action_space.low, self.action_space.high)
+
+            new_obs, rewards, dones, infos = env.step(clipped_actions)
+            self.num_timesteps += env.num_envs
+            
+            # custome log
+            num_dones = int(sum(dones))
+            if num_dones > 0:
+                if len(self.ep_info_buffer) > 0 and len(self.ep_info_buffer[0]) > 0:
+                    ep_reward, ep_success = [], []
+                    for idx, info in enumerate(infos):
+                        maybe_ep_info = info.get("episode")
+                        if maybe_ep_info is not None:
+                            ep_reward.append(maybe_ep_info["r"])
+                            if self.metaworld_flag:
+                                ep_success.append(maybe_ep_info["s"])
+
+                    self.custom_logger.log('eval/episode_reward', np.mean(ep_reward), self.num_timesteps)
+                    self.custom_logger.log('eval/true_episode_reward', np.mean(ep_reward), self.num_timesteps)
+                    if self.metaworld_flag:
+                        self.custom_logger.log('eval/true_episode_success', np.mean(ep_success), self.num_timesteps)
+                    self.custom_logger.dump(self.num_timesteps)
+                    
+            # Give access to local variables
+            callback.update_locals(locals())
+            if callback.on_step() is False:
+                return False
+
+            self._update_info_buffer(infos)
+            n_steps += 1
+
+            if isinstance(self.action_space, gym.spaces.Discrete):
+                # Reshape in case of discrete action
+                actions = actions.reshape(-1, 1)
+            rollout_buffer.add(self._last_obs, actions, rewards, self._last_dones, values, log_probs)
             self._last_obs = new_obs
             self._last_dones = dones
 
@@ -527,6 +619,71 @@ class OnPolicyRewardAlgorithm(BaseAlgorithm):
                     self.first_reward_train = 2
                     self.policy.reset_value()
                 continue_training = self.collect_rollouts(self.env, callback, self.rollout_buffer, n_rollout_steps=self.n_steps)
+                                
+            if continue_training is False:
+                break
+
+            iteration += 1
+            self._update_current_progress_remaining(self.num_timesteps, total_timesteps)
+
+            # Display training infos
+            if log_interval is not None and iteration % log_interval == 0:
+                fps = int(self.num_timesteps / (time.time() - self.start_time))
+                logger.record("time/iterations", iteration, exclude="tensorboard")
+                logger.record("reward/total_feed", self.total_feed)
+                logger.record("reward/labeled_feedback", self.labeled_feedback)
+                logger.record("reward/noisy_feedback", self.noisy_feedback)
+                if len(self.ep_info_buffer) > 0 and len(self.ep_info_buffer[0]) > 0:
+                    self.avg_train_true_return = safe_mean([ep_info["r"] for ep_info in self.ep_info_buffer])
+                    logger.record("rollout/ep_rew_mean", self.avg_train_true_return)
+                    logger.record("rollout/ep_len_mean", safe_mean([ep_info["l"] for ep_info in self.ep_info_buffer]))
+                    if self.metaworld_flag:
+                        logger.record("rollout/ep_success_mean", safe_mean([ep_info["s"] for ep_info in self.ep_info_buffer]))
+                logger.record("time/fps", fps)
+                logger.record("time/time_elapsed", int(time.time() - self.start_time), exclude="tensorboard")
+                logger.record("time/total_timesteps", self.num_timesteps, exclude="tensorboard")
+                logger.dump(step=self.num_timesteps)
+            
+            
+            if self.first_reward_train == 2:
+                self.train()
+            else:
+                self.train_unsuper()
+
+        callback.on_training_end()
+
+        return self
+    
+    def learn_unsuper_true(
+        self,
+        total_timesteps: int,
+        callback: MaybeCallback = None,
+        log_interval: int = 1,
+        eval_env: Optional[GymEnv] = None,
+        eval_freq: int = -1,
+        n_eval_episodes: int = 5,
+        tb_log_name: str = "OnPolicyRewardAlgorithm",
+        eval_log_path: Optional[str] = None,
+        reset_num_timesteps: bool = True,
+    ) -> "OnPolicyRewardAlgorithm":
+        iteration = 0
+
+        total_timesteps, callback = self._setup_learn(
+            total_timesteps, eval_env, callback, eval_freq, n_eval_episodes, eval_log_path, reset_num_timesteps, tb_log_name
+        )
+
+        callback.on_training_start(locals(), globals())
+ 
+        while self.num_timesteps < total_timesteps:
+            if self.num_timesteps < self.unsuper_step:
+                continue_training = self.collect_rollouts_unsuper(
+                    self.env, callback, self.rollout_buffer, 
+                    n_rollout_steps=self.n_steps, replay_buffer=self.unsuper_buffer)
+            else:
+                if self.first_reward_train == 0:
+                    self.first_reward_train = 2
+                    self.policy.reset_value()
+                continue_training = self.collect_rollouts_true(self.env, callback, self.rollout_buffer, n_rollout_steps=self.n_steps)
                                 
             if continue_training is False:
                 break
