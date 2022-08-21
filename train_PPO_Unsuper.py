@@ -32,7 +32,7 @@ def linear_schedule(initial_value: Union[float, str]) -> Callable[[float], float
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--env", type=str, default="walker_walk", help="environment ID")
-    parser.add_argument("-tb", "--tensorboard-log", help="Tensorboard log dir", default="logs/PrefPPO/", type=str)
+    parser.add_argument("-tb", "--tensorboard-log", help="Tensorboard log dir", default="logs/PPO_Unsuper/", type=str)
     parser.add_argument("--seed", help="Random generator seed", type=int, default=123)
     parser.add_argument("--n-envs", help="# of parallel environments", type=int, default=16)
     parser.add_argument("--n-steps", help="# of steps to run for each environment per update", type=int, default=500)
