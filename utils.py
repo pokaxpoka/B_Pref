@@ -209,42 +209,47 @@ class SquashedNormal(pyd.transformed_distribution.TransformedDistribution):
         return mu
     
 class TorchRunningMeanStd:
-    def __init__(self, epsilon=1e-4, shape=(), device=None):
+    """Stores a running mean and variance using Wellford's algorithm."""
+
+    def __init__(
+        self,
+        shape=(),
+        device=None,
+    ):
+        """Initialize blank mean, variance, count."""
         self.mean = torch.zeros(shape, device=device)
-        self.var = torch.ones(shape, device=device)
-        self.count = epsilon
+        self.M2 = torch.zeros(shape, device=device)
+        self.count = 0
 
     def update(self, x):
         with torch.no_grad():
-            batch_mean = torch.mean(x, axis=0)
-            batch_var = torch.var(x, axis=0)
+            batch_mean = torch.mean(x, dim=0)
+            batch_var = torch.var(x, dim=0, unbiased=False)
             batch_count = x.shape[0]
-            self.update_from_moments(batch_mean, batch_var, batch_count)
+            batch_M2 = batch_var * batch_count
+            if self.count == 0:
+                self.count = batch_count
+                self.mean = batch_mean
+                self.M2 = batch_M2
+                return
 
-    def update_from_moments(self, batch_mean, batch_var, batch_count):
-        self.mean, self.var, self.count = update_mean_var_count_from_moments(
-            self.mean, self.var, self.count, batch_mean, batch_var, batch_count
-        )
+            delta = batch_mean - self.mean
+            total_count = self.count + batch_count
+            self.mean += delta * batch_count / total_count
+
+            self.M2 += batch_M2 + delta * delta * self.count * batch_count / total_count
+
+            self.count = total_count
+
+    @property
+    def var(self):
+        """Returns the unbiased estimate of the variances."""
+        return self.M2 / (self.count - 1)
 
     @property
     def std(self):
-        return torch.sqrt(self.var)
-
-
-def update_mean_var_count_from_moments(
-    mean, var, count, batch_mean, batch_var, batch_count
-):
-    delta = batch_mean - mean
-    tot_count = count + batch_count
-
-    new_mean = mean + delta + batch_count / tot_count
-    m_a = var * count
-    m_b = batch_var * batch_count
-    M2 = m_a + m_b + torch.pow(delta, 2) * count * batch_count / tot_count
-    new_var = M2 / tot_count
-    new_count = tot_count
-
-    return new_mean, new_var, new_count
+        """Returns the unbiased estimate of the standard deviations."""
+        return np.sqrt(self.var)
 
 def mlp(input_dim, hidden_dim, output_dim, hidden_depth, output_mod=None):
     if hidden_depth == 0:
